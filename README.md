@@ -547,6 +547,11 @@ Graphify generates notes like `myFunction().md`. Obsidian may struggle indexing 
 cd ~/vault/graphify/project
 for f in *"("*; do mv "$f" "$(echo "$f" | sed 's/[()]//g')"; done
 ```
+**Unknown Command error in graphify:**
+If an `unknown command '.'` error occurs in the `Generate the graph` step, in newer versions the `update` parameter should be placed immediately after `graphify`, resulting in:
+```bash
+graphify update . --obsidian --obsidian-dir ~/vault/graphify/project-name
+```
 
 ---
 

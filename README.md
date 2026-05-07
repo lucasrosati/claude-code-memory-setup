@@ -318,18 +318,37 @@ Install the **"Export Claude Chat to Markdown"** browser extension for Chrome/Ed
 
 ```bash
 pip install graphifyy
-graphify install
+graphify install --platform claude
 ```
 
-`graphify install` creates the skill at `~/.claude/skills/graphify/SKILL.md`.
+`graphify install --platform claude` creates the skill at `~/.claude/skills/graphify/SKILL.md`. Other platforms are also supported (`cursor`, `codex`, `opencode`, etc.).
+
+**1.5. Set up API key (required for semantic extraction):**
+
+Graphify needs an LLM API key for semantic extraction. Export one before running:
+
+```bash
+# Claude (Anthropic)
+export ANTHROPIC_API_KEY="your-key-here"
+
+# Or Moonshot (Kimi)
+export MOONSHOT_API_KEY="your-key-here"
+```
+
+If you want to skip LLM costs entirely, use AST-only mode:
+
+```bash
+graphify extract . --out ./graphify-out --no-cluster
+```
+
+This generates a structural graph without semantic edges.
 
 **2. Generate the graph:**
 
 From your project root:
 
 ```bash
-# Full pipeline + Obsidian notes in the centralized vault
-graphify . --obsidian --obsidian-dir ~/vault/graphify/project-name
+graphify extract . --out ./graphify-out
 ```
 
 Generated output:
@@ -338,16 +357,26 @@ Generated output:
 your-project/
 └── graphify-out/
     ├── graph.json          # queryable graph (Claude Code uses this)
-    ├── graph.html          # interactive visualization (open in browser)
+    ├── GRAPH_TREE.html     # interactive tree visualization (run `graphify tree`)
     ├── GRAPH_REPORT.md     # god nodes, connections, metrics
-    ├── wiki/               # Wikipedia-style articles (agent navigation)
     └── cache/              # SHA256 cache
-
-~/vault/graphify/project-name/
-    └── (Obsidian notes)    # each function/module as a node in graph view
 ```
 
-**3. Update .gitignore:**
+**Note:** Auto-generation of Obsidian notes from the graph isn't supported by the current graphify CLI. To integrate with Obsidian, symlink the graph directory into your vault:
+
+```bash
+ln -s $(pwd)/graphify-out ~/vault/graphify/project-name/graphify-out
+```
+
+**3. Generate interactive visualization:**
+
+```bash
+graphify tree --graph ./graphify-out/graph.json --output ./graphify-out/GRAPH_TREE.html
+```
+
+Open the HTML file in a browser to explore the graph interactively.
+
+**4. Update .gitignore:**
 
 ```gitignore
 # Graphify
@@ -356,7 +385,7 @@ graphify-out/cache/
 
 Keep `graph.json` and `GRAPH_REPORT.md` versioned — they're useful for the team.
 
-**4. Add to the project's CLAUDE.md:**
+**5. Add to the project's CLAUDE.md:**
 
 Append to the CLAUDE.md at the repository root:
 
@@ -372,7 +401,7 @@ Append to the CLAUDE.md at the repository root:
 
 ### When to rebuild the graph
 - After structural changes (new modules, major refactors)
-- Command: `graphify . --update` (only processes modified files)
+- Command: `graphify update .` (only processes modified files)
 - The graph is persistent — NO need to rebuild every session
 
 ### Do NOT
@@ -380,7 +409,7 @@ Append to the CLAUDE.md at the repository root:
 - Don't re-read the entire codebase if the graph already has the information
 ```
 
-**5. Add to the vault's CLAUDE.md:**
+**6. Add to the vault's CLAUDE.md:**
 
 ```markdown
 ## Graphify (Codebase Maps)
@@ -395,7 +424,7 @@ Append to the CLAUDE.md at the repository root:
 - Filter by `-path:graphify` to hide code nodes
 ```
 
-**6. Git Hook (optional):**
+**7. Git Hook (optional):**
 
 Automatically rebuilds the graph on every commit:
 
@@ -403,24 +432,25 @@ Automatically rebuilds the graph on every commit:
 graphify hook install
 ```
 
-**7. Watch Mode (optional):**
+**8. Watch Mode (optional):**
 
 Auto-rebuild on file save (run in a separate terminal):
 
 ```bash
-graphify . --watch
+graphify watch .
 ```
 
 ### Useful Commands
 
 | Command | Description |
 |---------|-------------|
-| `graphify .` | Full pipeline on current directory |
-| `graphify ./src` | Scan specific folder |
-| `graphify . --update` | Only process modified files |
-| `graphify . --mode deep` | Semantic extraction (uses LLM, costs tokens) |
-| `graphify . --watch` | Auto-rebuild on save |
+| `graphify extract .` | Full extraction on current directory |
+| `graphify extract ./src` | Scan specific folder |
+| `graphify update .` | Only process modified files |
+| `graphify watch .` | Auto-rebuild on save |
 | `graphify query "question"` | Query the graph directly |
+| `graphify explain "NodeName"` | Plain-language explanation of a node |
+| `graphify path "A" "B"` | Shortest path between two nodes |
 | `open graphify-out/graph.html` | Open interactive visualization |
 
 ### Adding New Projects
@@ -429,10 +459,10 @@ With a centralized vault, each project is just a subfolder:
 
 ```bash
 cd ~/another-project
-graphify . --obsidian --obsidian-dir ~/vault/graphify/another-project
+graphify extract . --out ./graphify-out
 ```
 
-Notes automatically appear in Obsidian's graph view alongside everything else.
+Then symlink the output into your vault if you want it in Obsidian's graph view (see Step 2 above).
 
 ---
 
@@ -539,7 +569,7 @@ Check that the project's CLAUDE.md has the "Context Navigation" section and that
 Grant Full Disk Access to your terminal in System Preferences → Privacy & Security.
 
 **Graphify doesn't generate wiki:**
-The wiki requires semantic edges. In AST-only mode, use `graphify query "question"` or run `--mode deep` (costs API tokens).
+The wiki requires semantic edges. In AST-only mode (`--no-cluster`), use `graphify query "question"` instead, or re-run `graphify extract .` with an LLM API key set so semantic extraction happens automatically (costs API tokens).
 
 **Files with parentheses in name:**
 Graphify generates notes like `myFunction().md`. Obsidian may struggle indexing files with `()` in the name. If needed, batch rename:
@@ -548,9 +578,13 @@ cd ~/vault/graphify/project
 for f in *"("*; do mv "$f" "$(echo "$f" | sed 's/[()]//g')"; done
 ```
 **Unknown Command error in graphify:**
-If an `unknown command '.'` error occurs in the `Generate the graph` step, in newer versions the `update` parameter should be placed immediately after `graphify`, resulting in:
+If an `unknown command '.'` error occurs, the current CLI uses subcommands (e.g. `extract`, `update`, `watch`) before the path. Use:
 ```bash
-graphify update . --obsidian --obsidian-dir ~/vault/graphify/project-name
+graphify extract . --out ./graphify-out
+```
+or, to refresh an existing graph:
+```bash
+graphify update .
 ```
 
 ---

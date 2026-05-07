@@ -318,18 +318,37 @@ Instale a extensão **"Export Claude Chat to Markdown"** no Chrome/Edge. Faça b
 
 ```bash
 pip install graphifyy
-graphify install
+graphify install --platform claude
 ```
 
-O `graphify install` cria o skill em `~/.claude/skills/graphify/SKILL.md`.
+O `graphify install --platform claude` cria o skill em `~/.claude/skills/graphify/SKILL.md`. Outras plataformas também são suportadas (`cursor`, `codex`, `opencode`, etc.).
+
+**1.5. Configurar API key (necessário para extração semântica):**
+
+O Graphify precisa de uma API key de LLM para extração semântica. Exporte uma antes de rodar:
+
+```bash
+# Claude (Anthropic)
+export ANTHROPIC_API_KEY="sua-chave-aqui"
+
+# Ou Moonshot (Kimi)
+export MOONSHOT_API_KEY="sua-chave-aqui"
+```
+
+Se quiser pular custos de LLM completamente, use o modo AST-only:
+
+```bash
+graphify extract . --out ./graphify-out --no-cluster
+```
+
+Isso gera um grafo estrutural sem edges semânticas.
 
 **2. Gerar o grafo:**
 
 Na raiz do seu projeto:
 
 ```bash
-# Pipeline completa + notas Obsidian no vault centralizado
-graphify . --obsidian --obsidian-dir ~/vault/graphify/nome-do-projeto
+graphify extract . --out ./graphify-out
 ```
 
 Output gerado:
@@ -338,16 +357,26 @@ Output gerado:
 seu-projeto/
 └── graphify-out/
     ├── graph.json          # grafo consultável (o Claude Code usa este)
-    ├── graph.html          # visualização interativa (abra no browser)
+    ├── GRAPH_TREE.html     # visualização interativa em árvore (rode `graphify tree`)
     ├── GRAPH_REPORT.md     # god nodes, conexões, métricas
-    ├── wiki/               # artigos estilo Wikipedia (navegação do agente)
     └── cache/              # cache SHA256
-
-~/vault/graphify/nome-do-projeto/
-    └── (notas Obsidian)    # cada função/módulo como um nó no graph view
 ```
 
-**3. Atualizar .gitignore:**
+**Nota:** A geração automática de notas Obsidian a partir do grafo não é suportada pelo CLI atual do graphify. Para integrar com o Obsidian, faça um symlink do diretório do grafo para dentro do vault:
+
+```bash
+ln -s $(pwd)/graphify-out ~/vault/graphify/nome-do-projeto/graphify-out
+```
+
+**3. Gerar visualização interativa:**
+
+```bash
+graphify tree --graph ./graphify-out/graph.json --output ./graphify-out/GRAPH_TREE.html
+```
+
+Abra o arquivo HTML no navegador para explorar o grafo interativamente.
+
+**4. Atualizar .gitignore:**
 
 ```gitignore
 # Graphify
@@ -356,7 +385,7 @@ graphify-out/cache/
 
 Mantenha `graph.json` e `GRAPH_REPORT.md` versionados.
 
-**4. Adicionar ao CLAUDE.md do projeto:**
+**5. Adicionar ao CLAUDE.md do projeto:**
 
 Adicione ao final do CLAUDE.md na raiz do repositório:
 
@@ -372,7 +401,7 @@ Adicione ao final do CLAUDE.md na raiz do repositório:
 
 ### Quando reconstruir o grafo
 - Após mudanças estruturais (novos módulos, refactors)
-- Comando: `graphify . --update` (só processa arquivos modificados)
+- Comando: `graphify update .` (só processa arquivos modificados)
 - O grafo é persistente — NÃO precisa reconstruir a cada sessão
 
 ### O que NÃO fazer
@@ -380,7 +409,7 @@ Adicione ao final do CLAUDE.md na raiz do repositório:
 - Não releia o codebase inteiro se o grafo já tem a informação
 ```
 
-**5. Adicionar ao CLAUDE.md do vault:**
+**6. Adicionar ao CLAUDE.md do vault:**
 
 ```markdown
 ## Graphify (Mapas de Codebase)
@@ -395,7 +424,7 @@ Adicione ao final do CLAUDE.md na raiz do repositório:
 - Filtrar por `-path:graphify` para esconder nós de código
 ```
 
-**6. Git Hook (opcional):**
+**7. Git Hook (opcional):**
 
 Reconstrói o grafo automaticamente a cada commit:
 
@@ -403,24 +432,25 @@ Reconstrói o grafo automaticamente a cada commit:
 graphify hook install
 ```
 
-**7. Watch Mode (opcional):**
+**8. Watch Mode (opcional):**
 
 Rebuild automático ao salvar arquivos (rode em terminal separado):
 
 ```bash
-graphify . --watch
+graphify watch .
 ```
 
 ### Comandos Úteis
 
 | Comando | Descrição |
 |---------|-----------|
-| `graphify .` | Pipeline completa no diretório atual |
-| `graphify ./src` | Escanear pasta específica |
-| `graphify . --update` | Só processa arquivos modificados |
-| `graphify . --mode deep` | Extração semântica (usa LLM, consome tokens) |
-| `graphify . --watch` | Auto-rebuild ao salvar |
+| `graphify extract .` | Extração completa no diretório atual |
+| `graphify extract ./src` | Escanear pasta específica |
+| `graphify update .` | Só processa arquivos modificados |
+| `graphify watch .` | Auto-rebuild ao salvar |
 | `graphify query "pergunta"` | Consultar o grafo diretamente |
+| `graphify explain "NomeDoNo"` | Explicação em linguagem natural de um nó |
+| `graphify path "A" "B"` | Caminho mais curto entre dois nós |
 | `open graphify-out/graph.html` | Abrir visualização interativa |
 
 ### Adicionando Novos Projetos
@@ -429,10 +459,10 @@ Com vault centralizado, cada projeto é uma subpasta:
 
 ```bash
 cd ~/outro-projeto
-graphify . --obsidian --obsidian-dir ~/vault/graphify/outro-projeto
+graphify extract . --out ./graphify-out
 ```
 
-As notas aparecem automaticamente no graph view do Obsidian.
+Depois faça um symlink do output para o vault se quiser ele no graph view do Obsidian (veja o Passo 2 acima).
 
 ---
 
@@ -539,7 +569,7 @@ Verifique se o CLAUDE.md do projeto tem a seção "Context Navigation" e se `gra
 Dê permissão de Full Disk Access ao terminal em Preferências do Sistema → Privacidade e Segurança.
 
 **Graphify não gera wiki:**
-A wiki requer edges semânticas. No modo AST-only, use `graphify query "pergunta"` ou rode `--mode deep` (consome tokens da API).
+A wiki requer edges semânticas. No modo AST-only (`--no-cluster`), use `graphify query "pergunta"`, ou rode `graphify extract .` novamente com uma API key de LLM exportada para que a extração semântica aconteça automaticamente (consome tokens da API).
 
 **Arquivos com parênteses no nome:**
 O Graphify gera notas como `minhaFuncao().md`. O Obsidian pode ter dificuldades de indexação com `()` nos nomes. Se necessário, renomeie em batch:

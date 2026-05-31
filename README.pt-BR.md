@@ -325,13 +325,11 @@ O `graphify install --platform claude` cria o skill em `~/.claude/skills/graphif
 
 **1.5. Configurar API key (necessário para extração semântica):**
 
-O Graphify precisa de uma API key de LLM para extração semântica. Exporte uma antes de rodar:
+O Graphify precisa de uma API key de LLM da Anthropic ou da Moonshot (Kimi) para extração semântica. Exporte uma antes de rodar:
 
 ```bash
-# Claude (Anthropic)
 export ANTHROPIC_API_KEY="sua-chave-aqui"
-
-# Ou Moonshot (Kimi)
+# ou
 export MOONSHOT_API_KEY="sua-chave-aqui"
 ```
 
@@ -345,30 +343,46 @@ Isso gera um grafo estrutural sem edges semânticas.
 
 **2. Gerar o grafo:**
 
-Na raiz do seu projeto:
+O Graphify tem dois caminhos de execução e as flags `--obsidian*` originais só funcionam em um deles. Escolha o formato que corresponde a como você está invocando:
+
+**A. Dentro do Claude Code (skill — recomendado para este guia):**
+
+```
+/graphify . --obsidian --obsidian-dir ~/vault/graphify/nome-do-projeto
+```
+
+Isso roda o slash command `/graphify`, que o skill em `~/.claude/skills/graphify/SKILL.md` interpreta. O skill chama `graphify.export.to_obsidian()` em Python diretamente, então `--obsidian` e `--obsidian-dir` são reconhecidas aqui — elas não fazem parte do parser do shell headless.
+
+**B. Do terminal / CI (CLI headless):**
 
 ```bash
 graphify extract . --out ./graphify-out
 ```
 
-Output gerado:
-
-```
-seu-projeto/
-└── graphify-out/
-    ├── graph.json          # grafo consultável (o Claude Code usa este)
-    ├── GRAPH_TREE.html     # visualização interativa em árvore (rode `graphify tree`)
-    ├── GRAPH_REPORT.md     # god nodes, conexões, métricas
-    └── cache/              # cache SHA256
-```
-
-**Nota:** A geração automática de notas Obsidian a partir do grafo não é suportada pelo CLI atual do graphify. Para integrar com o Obsidian, faça um symlink do diretório do grafo para dentro do vault:
+O CLI headless usa subcomandos (`extract`, `update`, `watch`, `tree`) e **não** expõe `--obsidian` / `--obsidian-dir` / `--wiki` / `--mode deep`. Se quiser integração com Obsidian a partir do terminal, faça um symlink do diretório de output para o vault depois da extração:
 
 ```bash
 ln -s $(pwd)/graphify-out ~/vault/graphify/nome-do-projeto/graphify-out
 ```
 
-**3. Gerar visualização interativa:**
+Output gerado (varia conforme o caminho e as flags):
+
+```
+seu-projeto/
+└── graphify-out/
+    ├── graph.json          # grafo consultável (sempre)
+    ├── graph.html          # viz interativa (skill auto-gera; headless: ver passo 3)
+    ├── GRAPH_REPORT.md     # god nodes, conexões, métricas (sempre)
+    ├── wiki/               # artigos estilo Wikipedia (só skill com --wiki)
+    └── cache/              # cache SHA256
+
+~/vault/graphify/nome-do-projeto/    # só quando o skill recebeu --obsidian
+    └── (notas Obsidian)              # uma nota por função/módulo
+```
+
+**3. Gerar visualização interativa (só no caminho headless):**
+
+O skill auto-gera `graph.html` durante a extração. Para o caminho headless, rode a visualização como passo separado:
 
 ```bash
 graphify tree --graph ./graphify-out/graph.json --output ./graphify-out/GRAPH_TREE.html
@@ -401,7 +415,8 @@ Adicione ao final do CLAUDE.md na raiz do repositório:
 
 ### Quando reconstruir o grafo
 - Após mudanças estruturais (novos módulos, refactors)
-- Comando: `graphify update .` (só processa arquivos modificados)
+- Headless: `graphify update .` (só processa arquivos modificados)
+- Skill: `/graphify . --update` (mesmo comportamento, rodando via skill — também aceita `--obsidian` para atualizar o vault)
 - O grafo é persistente — NÃO precisa reconstruir a cada sessão
 
 ### O que NÃO fazer
@@ -434,13 +449,23 @@ graphify hook install
 
 **8. Watch Mode (opcional):**
 
-Rebuild automático ao salvar arquivos (rode em terminal separado):
+Rebuild automático ao salvar arquivos. Escolha o formato conforme como você invoca o graphify.
+
+Headless (terminal separado):
 
 ```bash
 graphify watch .
 ```
 
+Skill (dentro do Claude Code):
+
+```
+/graphify . --watch
+```
+
 ### Comandos Úteis
+
+A tabela abaixo lista os subcomandos do **CLI headless** que você rodaria no terminal. Dentro do Claude Code, as mesmas operações estão disponíveis via o slash command `/graphify` documentado em `~/.claude/skills/graphify/SKILL.md` — esse formato aceita adicionalmente `--obsidian`, `--obsidian-dir`, `--wiki` e `--mode deep` (que o parser headless não expõe).
 
 | Comando | Descrição |
 |---------|-----------|
@@ -451,18 +476,28 @@ graphify watch .
 | `graphify query "pergunta"` | Consultar o grafo diretamente |
 | `graphify explain "NomeDoNo"` | Explicação em linguagem natural de um nó |
 | `graphify path "A" "B"` | Caminho mais curto entre dois nós |
-| `open graphify-out/graph.html` | Abrir visualização interativa |
+| `graphify tree --graph ./graphify-out/graph.json --output ./graphify-out/GRAPH_TREE.html` | Gerar visualização interativa |
+| `open graphify-out/graph.html` | Abrir visualização interativa (skill gera) ou `GRAPH_TREE.html` (headless) |
 
 ### Adicionando Novos Projetos
 
-Com vault centralizado, cada projeto é uma subpasta:
+Com vault centralizado, cada projeto é uma subpasta. Mesmos dois caminhos do setup inicial.
+
+Skill (dentro do Claude Code):
+
+```
+/graphify ~/outro-projeto --obsidian --obsidian-dir ~/vault/graphify/outro-projeto
+```
+
+Headless (terminal):
 
 ```bash
 cd ~/outro-projeto
 graphify extract . --out ./graphify-out
+ln -s $(pwd)/graphify-out ~/vault/graphify/outro-projeto/graphify-out
 ```
 
-Depois faça um symlink do output para o vault se quiser ele no graph view do Obsidian (veja o Passo 2 acima).
+Pule a linha do `ln -s` se você não precisa que o Obsidian enxergue o grafo. As notas aparecem no graph view do Obsidian junto com tudo o mais.
 
 ---
 
@@ -569,7 +604,7 @@ Verifique se o CLAUDE.md do projeto tem a seção "Context Navigation" e se `gra
 Dê permissão de Full Disk Access ao terminal em Preferências do Sistema → Privacidade e Segurança.
 
 **Graphify não gera wiki:**
-A wiki requer edges semânticas. No modo AST-only (`--no-cluster`), use `graphify query "pergunta"`, ou rode `graphify extract .` novamente com uma API key de LLM exportada para que a extração semântica aconteça automaticamente (consome tokens da API).
+A pasta `wiki/` só é produzida pelo **formato skill com `--wiki`** (`/graphify . --wiki` dentro do Claude Code). O subcomando headless `graphify extract` não expõe `--wiki`. Do terminal, use `graphify query "pergunta"` contra o `graph.json`, ou rode o formato skill se precisar dos artigos estilo Wikipedia.
 
 **Arquivos com parênteses no nome:**
 O Graphify gera notas como `minhaFuncao().md`. O Obsidian pode ter dificuldades de indexação com `()` nos nomes. Se necessário, renomeie em batch:

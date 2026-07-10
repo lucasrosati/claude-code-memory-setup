@@ -83,6 +83,12 @@ O Claude Code acessa esse vault através do `CLAUDE.md` e de skills customizados
 
 > **Por que um vault único?** Ter um vault por projeto fragmenta o conhecimento. Com vault único, uma nota sobre "Supabase Auth" é linkada tanto pelo projeto A quanto pelo B. O graph view mostra conexões entre projetos que você não esperava.
 
+> **⚠️ Mantenha código FORA do vault** O vault guarda **apenas notas**. Nunca
+> coloque um repositório de código (com `node_modules/`, `.next/`, `dist/`, output de build) *dentro* de `~/vault/` —
+> o Obsidian vai tentar indexar dezenas de milhares de arquivos, travar até parar, e inundar o graph com
+> ruído. Mantenha cada repositório de código em seu próprio local (ex.: `~/meu-projeto/`); a pasta
+> `meu-projeto/` do vault guarda apenas as **notas** daquele projeto (`projeto/`, `logs/`, `features/`, …).
+
 ### Setup Passo a Passo
 
 **Pré-requisitos:**
@@ -181,7 +187,39 @@ type: permanent
 EOF
 ```
 
-**5. Plugins recomendados no Obsidian:**
+**5. Transforme os comandos de sessão em skills (recomendado):**
+
+Os blocos `/retomar` e `/salvar` acima funcionam como instruções no `CLAUDE.md`, mas a forma mais
+confiável de fazê-los disparar em *qualquer* projeto é implementá-los como **skills globais** em
+`~/.claude/skills/`. O Claude Code descobre essas skills automaticamente e as invoca pelo nome — sem
+precisar repetir o texto no `CLAUDE.md` de cada projeto.
+
+Crie uma pasta por comando, cada uma contendo um `SKILL.md`:
+
+```bash
+mkdir -p ~/.claude/skills/salvar ~/.claude/skills/retomar
+```
+
+- `~/.claude/skills/salvar/SKILL.md` — no `/salvar`, escreve um session log datado em `logs/` do
+  projeto e incorpora quaisquer decisões novas em `projeto/`.
+- `~/.claude/skills/retomar/SKILL.md` — no `/retomar`, lê `projeto/` do projeto mais os session logs
+  mais recentes e resume o estado atual e o que falta.
+
+Cada `SKILL.md` precisa de frontmatter YAML com um `name:` que **corresponde à pasta** (`salvar` →
+`/salvar`) e uma `description:` (usada para dispará-lo), seguido das instruções — reutilize os passos
+do bloco Comandos de Sessão acima. Depois registre ambos no seu `~/.claude/CLAUDE.md` **global**
+para que fiquem disponíveis em todos os projetos:
+
+```markdown
+# comandos de sessão
+- **salvar** (`~/.claude/skills/salvar/SKILL.md`) — escreve um session log no vault. Trigger: `/salvar`
+- **retomar** (`~/.claude/skills/retomar/SKILL.md`) — rehidrata o contexto do projeto. Trigger: `/retomar`
+```
+
+> **Dica:** a forma mais rápida de escrever os dois arquivos `SKILL.md` é entregar os bullets acima
+> ao Claude Code e deixá-lo redigir, depois ajustar ao seu gosto.
+
+**6. Plugins recomendados no Obsidian:**
 
 | Plugin | Para que serve | Como instalar |
 |--------|---------------|---------------|
@@ -397,7 +435,7 @@ Abra o arquivo HTML no navegador para explorar o grafo interativamente.
 graphify-out/cache/
 ```
 
-Mantenha `graph.json` e `GRAPH_REPORT.md` versionados.
+Mantenha `graph.json` e `GRAPH_REPORT.md` versionados — são úteis para o time.
 
 **5. Adicionar ao CLAUDE.md do projeto:**
 
@@ -611,6 +649,17 @@ O Graphify gera notas como `minhaFuncao().md`. O Obsidian pode ter dificuldades 
 ```bash
 cd ~/vault/graphify/projeto
 for f in *"("*; do mv "$f" "$(echo "$f" | sed 's/[()]//g')"; done
+```
+**Erro "Unknown Command" no graphify:**
+Se `graphify .` der erro `unknown command '.'`, você está rodando o **CLI headless** — que exige um subcomando (`extract`, `update`, `watch`, etc.) antes do caminho. Use o formato headless:
+```bash
+graphify extract . --out ./graphify-out
+# ou, para atualizar um grafo existente:
+graphify update .
+```
+Ou, dentro do Claude Code, use o **formato skill** com a barra inicial — que passa pelo skill `/graphify` em vez do parser do shell e suporta o conjunto completo de flags (`--obsidian`, `--obsidian-dir`, `--wiki`, `--mode deep`, etc.):
+```
+/graphify . --obsidian --obsidian-dir ~/vault/graphify/nome-do-projeto
 ```
 
 ---

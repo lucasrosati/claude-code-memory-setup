@@ -83,6 +83,12 @@ Claude Code accesses the vault through `CLAUDE.md` and custom skills.
 
 > **Why a single vault?** Having one vault per project fragments knowledge. With a single vault, a note about "Supabase Auth" links to both project A and B. The graph view reveals cross-project connections you didn't expect.
 
+> **⚠️ Keep code OUT of the vault** The vault holds **notes only**. Never
+> put a code repo (with `node_modules/`, `.next/`, `dist/`, build output) *inside* `~/vault/` —
+> Obsidian will try to index tens of thousands of files, crawl to a halt, and flood the graph with
+> noise. Keep each code repo in its own location (e.g. `~/my-project/`); the vault's
+> `my-project/` folder holds only that project's **notes** (`architecture/`, `logs/`, `features/`, …).
+
 ### Step-by-Step Setup
 
 **Prerequisites:**
@@ -181,7 +187,39 @@ type: permanent
 EOF
 ```
 
-**5. Recommended Obsidian plugins:**
+**5. Turn the session commands into skills (recommended):**
+
+The `/resume` and `/save` blocks above work as `CLAUDE.md` instructions, but the most reliable way
+to make them fire in *any* project is to implement them as **global skills** under
+`~/.claude/skills/`. Claude Code discovers these automatically and invokes them by name — no need
+to repeat the prose in every project's `CLAUDE.md`.
+
+Create one folder per command, each containing a `SKILL.md`:
+
+```bash
+mkdir -p ~/.claude/skills/save ~/.claude/skills/resume
+```
+
+- `~/.claude/skills/save/SKILL.md` — on `/save`, writes a dated session log to the project's
+  `logs/` and folds any new decisions into its `architecture/`.
+- `~/.claude/skills/resume/SKILL.md` — on `/resume`, reads the project's `architecture/` plus the
+  most recent session logs and summarizes current state and what's left.
+
+Each `SKILL.md` needs YAML frontmatter with a `name:` that **matches the folder** (`save` →
+`/save`) and a `description:` (used to trigger it), followed by the instructions — reuse the steps
+from the Session Commands block above. Then register both in your **global** `~/.claude/CLAUDE.md`
+so they're available in every project:
+
+```markdown
+# session commands
+- **save** (`~/.claude/skills/save/SKILL.md`) — write a session log to the vault. Trigger: `/save`
+- **resume** (`~/.claude/skills/resume/SKILL.md`) — rehydrate project context. Trigger: `/resume`
+```
+
+> **Tip:** the fastest way to author the two `SKILL.md` files is to hand Claude Code the bullets
+> above and let it draft them, then adjust to taste.
+
+**6. Recommended Obsidian plugins:**
 
 | Plugin | Purpose | Install method |
 |--------|---------|----------------|

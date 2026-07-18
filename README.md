@@ -185,8 +185,7 @@ EOF
 
 | Plugin | Purpose | Install method |
 |--------|---------|----------------|
-| BRAT | Install beta plugins | Community Plugins → Browse |
-| 3D Graph | 3D vault visualization | Via BRAT (v2.4.1) |
+| New 3D Graph(apoo711) | 3D vault visualization | Community Plugins → Browse |
 | Folders to Graph | Folders as graph nodes | Community Plugins → Browse |
 | Calendar | Daily note navigation | Community Plugins → Browse |
 

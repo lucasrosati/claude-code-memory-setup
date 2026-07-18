@@ -97,7 +97,7 @@ Obsidian → "Create new vault" → choose a name and location.
 
 ```bash
 cd ~/vault  # adjust to your path
-mkdir -p permanent inbox fleeting templates logs references
+mkdir -p permanent inbox fleeting templates logs references chats/code chats/web graphify
 mkdir -p my-project/{architecture,pipeline,data,features,logs}
 ```
 
@@ -185,8 +185,7 @@ EOF
 
 | Plugin | Purpose | Install method |
 |--------|---------|----------------|
-| BRAT | Install beta plugins | Community Plugins → Browse |
-| 3D Graph | 3D vault visualization | Via BRAT (v2.4.1) |
+| New 3D Graph(apoo711) | 3D vault visualization | Community Plugins → Browse |
 | Folders to Graph | Folders as graph nodes | Community Plugins → Browse |
 | Calendar | Daily note navigation | Community Plugins → Browse |
 
@@ -212,79 +211,11 @@ Your Claude chats (both Code and Web) contain valuable decisions, insights, and 
 
 ### Setup
 
-**1. Install the Claude Code extractor:**
+**1. Setup scripts:**
 
-```bash
-pip install claude-conversation-extractor
-```
+Read [instructions here](scripts/README.md)
 
-**2. Create staging directories:**
-
-```bash
-mkdir -p ~/claude-exports/code ~/claude-exports/web
-```
-
-**3. Create the post-processing script (`~/scripts/claude_to_obsidian.py`):**
-
-The script should:
-- Read each exported `.md` file
-- Detect origin (Code vs Web)
-- Generate automatic tags based on content keywords
-- Add standardized YAML frontmatter
-- Insert `[[wikilinks]]` for notes that already exist in the vault
-- Copy to `chats/code/` or `chats/web/` inside the vault
-
-Example keyword-to-tag mapping:
-
-```python
-KEYWORD_TAG_MAP = {
-    "python": "python",
-    "react": "react",
-    "supabase": "supabase",
-    "deploy": "deploy",
-    "bug": "debugging",
-    "refactor": "refactoring",
-    # add your own
-}
-```
-
-**4. Create the automation script (`~/scripts/sync_claude_obsidian.sh`):**
-
-```bash
-#!/bin/bash
-EXPORT_DIR="$HOME/claude-exports"
-VAULT_DIR="$HOME/vault"  # adjust to your path
-SCRIPT_DIR="$HOME/scripts"
-LOG="$SCRIPT_DIR/sync.log"
-
-echo "[$(date)] Sync started" >> "$LOG"
-
-# Export Claude Code chats
-claude-extract --all --output "$EXPORT_DIR/code" 2>> "$LOG"
-
-# Process and send to vault
-python3 "$SCRIPT_DIR/claude_to_obsidian.py" \
-    --export-dir "$EXPORT_DIR" \
-    --vault-dir "$VAULT_DIR" \
-    --move 2>> "$LOG"
-
-echo "[$(date)] Sync completed" >> "$LOG"
-```
-
-**5. Schedule automatic execution:**
-
-```bash
-chmod +x ~/scripts/sync_claude_obsidian.sh
-
-# Run daily at 10 PM
-(crontab -l 2>/dev/null; echo "0 22 * * * $HOME/scripts/sync_claude_obsidian.sh") | crontab -
-```
-
-**6. For Claude Web chats:**
-
-Install the **"Export Claude Chat to Markdown"** browser extension for Chrome/Edge. Do periodic bulk exports, save the `.md` files to `~/claude-exports/web/`, and the cron job handles the rest.
-
-**7. Add a section to the vault's CLAUDE.md:**
+**2. Add a section to the vault's CLAUDE.md:**
 
 ```markdown
 ## Chat Import Pipeline
@@ -317,11 +248,11 @@ Install the **"Export Claude Chat to Markdown"** browser extension for Chrome/Ed
 **1. Install:**
 
 ```bash
-pip install graphifyy
-graphify install --platform claude
+pipx install graphifyy
+graphify install
 ```
 
-`graphify install --platform claude` creates the skill at `~/.claude/skills/graphify/SKILL.md`. Other platforms are also supported (`cursor`, `codex`, `opencode`, etc.).
+`graphify install` creates the skill at `~/.claude/skills/graphify/SKILL.md`. Other platforms are also supported (`cursor`, `codex`, `opencode`, etc.).
 
 **1.5. Set up API key (required for semantic extraction):**
 

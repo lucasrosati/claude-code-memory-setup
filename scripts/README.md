@@ -23,8 +23,10 @@ Helper scripts for the Claude Code + Obsidian + Graphify setup.
 2. **Install the Claude Code extractor:**
 
    ```bash
-   pip install claude-conversation-extractor
+   pipx install claude-conversation-extractor
    ```
+
+When you have any errors, follow official instalation guide <https://github.com/ZeroSumQuant/claude-conversation-extractor/blob/main/docs/user/INSTALL.md>
 
 3. **Edit `sync_claude_obsidian.sh`:**
 
@@ -63,11 +65,14 @@ Helper scripts for the Claude Code + Obsidian + Graphify setup.
    (crontab -l 2>/dev/null; echo "0 22 * * * $HOME/scripts/sync_claude_obsidian.sh") | crontab -
    ```
 
+7. **For Claude Web chats:**
+
+Install the **"Export Claude Chat to Markdown"** browser extension for Chrome/Edge. Do periodic bulk exports, save the `.md` files to `~/claude-exports/web/`, and the cron job handles the rest.
+
 ## How it works
 
 1. `sync_claude_obsidian.sh` runs `claude-extract` to export all Claude Code conversations as `.md` files into `~/claude-exports/code/`
-2. Web chats can be manually exported via the **"Export Claude Chat to Markdown"** browser extension into `~/claude-exports/web/`
-3. `claude_to_obsidian.py` processes each `.md`:
+2. `claude_to_obsidian.py` processes each `.md`:
    - Detects origin (Code vs Web)
    - Generates auto-tags via keyword matching
    - Adds standardized YAML frontmatter

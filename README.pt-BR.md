@@ -16,8 +16,9 @@ Setup completo para transformar o Claude Code em um agente com memória de longo
 4. [Parte 2 — Pipeline de Importação de Chats](#parte-2--pipeline-de-importação-de-chats)
 5. [Parte 3 — Graphify (Knowledge Graph do Codebase)](#parte-3--graphify-knowledge-graph-do-codebase)
 6. [Parte 4 — Fluxo de Trabalho Completo](#parte-4--fluxo-de-trabalho-completo)
-7. [Resultados Reais](#resultados-reais)
-8. [Troubleshooting](#troubleshooting)
+7. [Parte 5 — Hook de Auto-Save (Rede de Segurança)](#parte-5--hook-de-auto-save-rede-de-segurança)
+8. [Resultados Reais](#resultados-reais)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -538,6 +539,100 @@ Abrir sessão no Claude Code
 | `path:graphify` | Só nós do codebase (funções, módulos, imports) |
 | `tag:chat-import` | Só chats importados |
 | `-path:graphify -path:chats` | Só notas manuais (vault "puro") |
+
+---
+
+## Parte 5 — Hook de Auto-Save (Rede de Segurança)
+
+### Conceito
+
+O comando `/salvar` gera session logs ricos, mas depende de você lembrar de rodá-lo. Esqueceu uma vez e a sessão evapora. Este hook resolve isso: o Claude Code dispara um evento `SessionEnd` quando uma sessão fecha (exit, `/clear`, logout), e um pequeno script Python extrai mecanicamente os fatos da sessão a partir do transcript e escreve um log mínimo no seu vault.
+
+Princípios de design (inspirado no [ai-memory](https://github.com/akitaonrails/ai-memory)):
+
+- **Zero chamadas de LLM.** Parsing puro de JSONL. Roda em milissegundos, não precisa de API key.
+- **Rede de segurança, não substituto.** O `/salvar` continua sendo o log rico (decisões, pendências, wikilinks). O auto-log garante que sessões esquecidas ainda deixem rastro: objetivo (primeiro prompt), arquivos tocados, comandos executados, estatísticas.
+- **Falha silenciosa.** Um hook nunca pode quebrar sua sessão. Erros vão para `~/scripts/autosave.log` e o Claude Code nem percebe.
+- **Filtro de ruído.** Sessões com menos de 2 mensagens do usuário são ignoradas.
+
+### Setup
+
+**1. Copie o script:**
+
+O script vive neste repo em [scripts/session_autosave.py](./scripts/session_autosave.py).
+
+```bash
+mkdir -p ~/scripts
+cp scripts/session_autosave.py ~/scripts/
+chmod +x ~/scripts/session_autosave.py
+```
+
+**2. Registre o hook no `~/.claude/settings.json`:**
+
+Se o arquivo já existir, faça merge da chave `hooks` sem remover nada:
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "VAULT_DIR=$HOME/vault python3 $HOME/scripts/session_autosave.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Ajuste o `VAULT_DIR` para o caminho do seu vault.
+
+**3. Teste:**
+
+Abra uma sessão do Claude Code em qualquer projeto, troque 2-3 mensagens com uma edição de arquivo e saia. Verifique:
+
+```bash
+tail -5 ~/scripts/autosave.log
+# deve mostrar: OK: wrote /caminho/do/vault/.../logs/YYYY-MM-DD-HHMM-auto-session.md
+```
+
+### Como funciona o roteamento
+
+O script deriva o nome do projeto do diretório de trabalho da sessão (basename do `cwd`):
+
+- Se `<vault>/<projeto>/` existir → o log vai para `<vault>/<projeto>/logs/`
+- Caso contrário → cai no fallback `<vault>/logs/`
+
+Se o nome da pasta do repo for diferente do nome da pasta no vault (ex.: repo `my-app-monorepo`, pasta do vault `my-app`), crie um symlink:
+
+```bash
+ln -s ~/vault/my-app ~/vault/my-app-monorepo
+```
+
+### Filtrando auto-logs no Obsidian
+
+Auto-logs recebem a tag `auto-log` e o frontmatter `status: imported`:
+
+| Filtro | O que mostra |
+|--------|-------------|
+| `tag:auto-log` | Só session logs gerados automaticamente |
+| `-tag:auto-log` | Esconde auto-logs (só notas manuais) |
+
+### Fluxo de trabalho atualizado
+
+```
+Abrir sessão no Claude Code
+    │
+    ├── /retomar                     ← carrega contexto do vault
+    ├── Trabalha no código
+    ├── /salvar (opcional)           ← log rico com decisões
+    └── exit                         ← hook SessionEnd dispara
+                                        auto-log escrito mesmo se
+                                        você esqueceu o /salvar
+```
 
 ---
 

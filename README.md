@@ -16,8 +16,9 @@ A complete setup to turn Claude Code into an agent with long-term memory and ful
 4. [Part 2 — Chat Import Pipeline](#part-2--chat-import-pipeline)
 5. [Part 3 — Graphify (Codebase Knowledge Graph)](#part-3--graphify-codebase-knowledge-graph)
 6. [Part 4 — Complete Workflow](#part-4--complete-workflow)
-7. [Real Results](#real-results)
-8. [Troubleshooting](#troubleshooting)
+7. [Part 5 — Auto-Save Hook (Safety Net)](#part-5--auto-save-hook-safety-net)
+8. [Real Results](#real-results)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -538,6 +539,100 @@ Open Claude Code session
 | `path:graphify` | Only codebase nodes (functions, modules, imports) |
 | `tag:chat-import` | Only imported chats |
 | `-path:graphify -path:chats` | Only manual notes (pure vault) |
+
+---
+
+## Part 5 — Auto-Save Hook (Safety Net)
+
+### Concept
+
+The `/save` command produces rich session logs, but it depends on you remembering to run it. Forget it once and the session vanishes. This hook fixes that: Claude Code fires a `SessionEnd` event when a session closes (exit, `/clear`, logout), and a small Python script mechanically extracts the session facts from the transcript and writes a minimal log to your vault.
+
+Design principles (inspired by [ai-memory](https://github.com/akitaonrails/ai-memory)):
+
+- **Zero LLM calls.** Pure JSONL parsing. Runs in milliseconds, needs no API key.
+- **Safety net, not replacement.** `/save` remains the rich log (decisions, pending items, wikilinks). The auto-log guarantees forgotten sessions still leave a trace: objective (first prompt), files touched, commands executed, stats.
+- **Silent failure.** A hook must never break your session. Errors go to `~/scripts/autosave.log` and Claude Code never notices.
+- **Noise filter.** Sessions with fewer than 2 user messages are skipped.
+
+### Setup
+
+**1. Copy the script:**
+
+The script lives in this repo at [scripts/session_autosave.py](./scripts/session_autosave.py).
+
+```bash
+mkdir -p ~/scripts
+cp scripts/session_autosave.py ~/scripts/
+chmod +x ~/scripts/session_autosave.py
+```
+
+**2. Register the hook in `~/.claude/settings.json`:**
+
+If the file already exists, merge the `hooks` key without removing anything else:
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "VAULT_DIR=$HOME/vault python3 $HOME/scripts/session_autosave.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Adjust `VAULT_DIR` to your vault path.
+
+**3. Test:**
+
+Open a Claude Code session in any project, exchange 2-3 messages with a file edit, then exit. Check:
+
+```bash
+tail -5 ~/scripts/autosave.log
+# should show: OK: wrote /path/to/vault/.../logs/YYYY-MM-DD-HHMM-auto-session.md
+```
+
+### How routing works
+
+The script derives the project name from the session's working directory (`cwd` basename):
+
+- If `<vault>/<project>/` exists → log goes to `<vault>/<project>/logs/`
+- Otherwise → falls back to `<vault>/logs/`
+
+If your repo folder name differs from the vault folder name (e.g. repo `my-app-monorepo`, vault folder `my-app`), create a symlink:
+
+```bash
+ln -s ~/vault/my-app ~/vault/my-app-monorepo
+```
+
+### Filtering auto-logs in Obsidian
+
+Auto-logs get the `auto-log` tag and `status: imported` frontmatter:
+
+| Filter | What it shows |
+|--------|--------------|
+| `tag:auto-log` | Only auto-generated session logs |
+| `-tag:auto-log` | Hide auto-logs (manual notes only) |
+
+### Updated workflow
+
+```
+Open Claude Code session
+    │
+    ├── /resume                      ← loads vault context
+    ├── Work on code
+    ├── /save (optional)             ← rich log with decisions
+    └── exit                         ← SessionEnd hook fires
+                                        auto-log written even if
+                                        you forgot /save
+```
 
 ---
 

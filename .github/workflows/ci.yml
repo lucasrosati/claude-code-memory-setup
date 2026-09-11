@@ -1,0 +1,111 @@
+# PR checks for a documentation repo with helper scripts.
+#
+# Design rules (see .github/workflows/README.md):
+#   - fast (< 2 min), no secrets, no style-only rules
+#   - every job catches a class of bug that already happened in a real PR
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-python:
+    name: lint-python
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Syntax check (py_compile)
+        run: |
+          set -euo pipefail
+          for f in scripts/*.py; do
+            echo "py_compile $f"
+            python -m py_compile "$f"
+          done
+      - name: Install ruff
+        run: python -m pip install --quiet ruff
+      - name: Ruff (real errors only, no style rules)
+        # E9 = syntax/IO errors, F63 = invalid comparisons,
+        # F7 = misplaced statements (break/continue/return), F82 = undefined names
+        run: ruff check scripts/ --select=E9,F63,F7,F82 --no-cache
+
+  lint-shell:
+    name: lint-shell
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck --version
+      - name: shellcheck (warning and above)
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(scripts/*.sh)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "no shell scripts in scripts/"; exit 0
+          fi
+          shellcheck --severity=warning "${files[@]}"
+
+  check-links:
+    name: check-links
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          # .lycheeignore at the repo root is picked up automatically.
+          # 429 = rate limited, not a broken link.
+          args: >-
+            --no-progress
+            --accept 200,204,206,429
+            --timeout 20
+            --max-retries 3
+            --retry-wait-time 2
+            --exclude-all-private
+            README.md README.pt-BR.md CHANGELOG.md scripts/README.md
+          fail: true
+          failIfEmpty: true
+
+  readme-parity:
+    name: readme-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: README.md vs README.pt-BR.md structure
+        run: python .github/scripts/check_parity.py
+
+  validate-hook-json:
+    name: validate-hook-json
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Validate JSON examples in the guide
+        run: python .github/scripts/check_json_blocks.py README.md README.pt-BR.md CHANGELOG.md scripts/README.md

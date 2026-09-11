@@ -708,6 +708,18 @@ cd ~/vault/graphify/projeto
 for f in *"("*; do mv "$f" "$(echo "$f" | sed 's/[()]//g')"; done
 ```
 
+**Erro Unknown Command no graphify:**
+Se `graphify .` falha com `unknown command '.'`, você está rodando a **CLI headless** — que exige um subcomando (`extract`, `update`, `watch`, etc.) antes do path. Use o formato headless:
+```bash
+graphify extract . --out ./graphify-out
+# or, to refresh an existing graph:
+graphify update .
+```
+Ou, dentro do Claude Code, use o **formato skill** com a barra inicial — que passa pela skill `/graphify` em vez do parser do shell e suporta o conjunto completo de flags (`--obsidian`, `--obsidian-dir`, `--wiki`, `--mode deep`, etc.):
+```
+/graphify . --obsidian --obsidian-dir ~/vault/graphify/project-name
+```
+
 ---
 
 ## Créditos e Links

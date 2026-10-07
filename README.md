@@ -1,6 +1,6 @@
 # Claude Code + Obsidian + Graphify: The Definitive Guide to Token Savings & Persistent Memory
 
-> **71.5x fewer tokens per session** with Graphify + **permanent memory across sessions** with Obsidian Zettelkasten.
+> **Persistent memory across sessions** with Obsidian Zettelkasten and selective code context with Graphify. Token savings depend on the task; the historical 71.5x/session and 499x/query claims are author-reported and not reproducible from published data.
 
 A complete setup to turn Claude Code into an agent with long-term memory and full codebase awareness — without wasting tokens re-reading files.
 
@@ -28,7 +28,7 @@ When working with Claude Code, two problems silently eat your tokens:
 
 **Problem 1 — Amnesia between sessions.** Every time you open a new session, you have to re-explain your project: stack, past decisions, current bugs, what's left to do. Claude Code remembers nothing from the previous session.
 
-**Problem 2 — Codebase re-reading.** Claude Code re-reads all your project files every session to understand the structure. A project with ~40 files burns ~20,000 tokens just for Claude to orient itself — before you even ask a question. If you run 10 sessions a day, that's **200,000 wasted tokens**.
+**Problem 2 — Codebase re-reading.** Repeated source exploration can consume context tokens, but how much depends on the task and navigation tools. The historical illustration compares ~20,000 tokens of source context with ~280 tokens of graph query output: approximately 71.4x less retrieval context, not a measured reduction in complete session usage. It assumes the smaller output answers the same question; the original payloads and tokenizer were not published.
 
 ---
 
@@ -43,7 +43,7 @@ Two complementary systems, each solving a different problem:
 | Conversation history | Import pipeline | Lost chat insights | Free |
 | Continuity | `/resume` and `/save` commands | Picking up where you left off | Free |
 
-Obsidian handles **what was decided** (declarative memory). Graphify handles **how the code is structured** (structural map). Together, Claude Code starts every session knowing everything — without re-reading anything.
+Obsidian handles **what was decided** (declarative memory). Graphify handles **how the code is structured** (structural map). Together, they can help Claude Code recover relevant context. Source reads remain necessary when the graph or notes are incomplete or stale.
 
 ---
 
@@ -527,7 +527,7 @@ Open Claude Code session
 | Layer | Without it | With it |
 |-------|-----------|---------|
 | `/resume` | Re-explain project every session | Claude already knows the context |
-| Graphify | Re-read ~40 files (~20k tokens) | Query 1 graph (~280 tokens) |
+| Graphify | Historical illustration: ~40 files (~20k tokens) | Selected graph query output (~280 tokens); unverified payload estimate, not session usage |
 | Chat pipeline | Insights lost in chat history | Everything indexed and searchable |
 | `/save` + logs | Forget what was done | Complete history with wikilinks |
 
@@ -638,7 +638,7 @@ Open Claude Code session
 
 ## Real Results
 
-Tested on a React + Supabase project with 126 TypeScript files:
+Author-reported example from a React + Supabase project with 126 TypeScript files. The source snapshot, graph, prompts, tokenizer and usage logs were not published, so these inventory counts and the token ratio cannot currently be reproduced:
 
 | Metric | Value |
 |--------|-------|
@@ -647,11 +647,19 @@ Tested on a React + Supabase project with 126 TypeScript files:
 | Communities detected | 124 |
 | graph.json size | 172 KB |
 | Obsidian notes generated | 456 |
-| Token reduction per query | **499x** |
-| LLM cost for generation | **0 tokens** (AST mode) |
+| Historical token reduction per query | **499x, author-reported; baseline and query counts unavailable** |
+| Reported LLM usage for graph generation | **0 tokens** (AST mode); excludes agent reads, queries and session usage |
 | Imported chats in vault | 137 |
 | Accumulated permanent notes | 65+ |
 | Total vault notes | 780+ |
+
+### Evidence and benchmark
+
+The historical **71.5x per session** headline is not supported by a published session ledger. The ~20,000 / ~280 illustration gives **~71.4x for retrieval context** (about 98.6% less), while **499x per query** is a separate undocumented comparison. Neither establishes end-to-end session savings or dollar savings.
+
+Hlido reports **82/100** for its repository review; the accessible public evidence does not validate these token ratios. See [issue #12](https://github.com/lucasrosati/claude-code-memory-setup/issues/12) and the [evidence audit and benchmark protocol](./benchmarks/README.md) for provenance, date discrepancies, assumptions and limitations.
+
+The protocol defines fixed inputs, paired source-navigation and memory arms, correctness criteria, cache accounting, graph construction costs, and separate query/session measurements. An [offline usage summarizer](./benchmarks/summarize.py) is included. Its synthetic fixture checks arithmetic only; no new performance results or paid runs are claimed.
 
 ---
 

@@ -1,0 +1,2 @@
+{"scope":"query","pair":"synthetic-only","arm":"baseline","request_id":"b1","usage":{"input_uncached":100,"input_cache_read":20,"input_cache_write":10,"output":10}}
+{"scope":"query","pair":"synthetic-only","arm":"memory","request_id":"m1","usage":{"input_uncached":40,"input_cache_read":10,"input_cache_write":10,"output":10}}

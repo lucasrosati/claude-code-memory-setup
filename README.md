@@ -144,19 +144,9 @@ type: permanent
 - Don't change folder structure without documenting it
 
 ## Session Commands
-
-### /resume
-When you receive this command:
-1. Read the 3 most recent session logs in logs/
-2. Read architecture/decisions.md for the current project
-3. Summarize current state and what's left to do
-
-### /save
-When you receive this command:
-1. Create a session log in logs/YYYY-MM-DD-description.md
-2. Record: what was done, decisions made, pending items
-3. Add wikilinks to created/modified notes
-4. Run git commit + push if in a repository
+/resume, /save, /memorize and /commit are installed from the guide's
+commands/ folder into ~/.claude/commands/ (see step 6). Their full
+instructions live there; this file only holds the vault rules they follow.
 ```
 
 **4. Create a note template:**
@@ -190,6 +180,20 @@ EOF
 | 3D Graph | 3D vault visualization | Via BRAT (v2.4.1) |
 | Folders to Graph | Folders as graph nodes | Community Plugins → Browse |
 | Calendar | Daily note navigation | Community Plugins → Browse |
+
+**6. Install the session commands:**
+
+The [commands/](./commands/) folder ships `/save`, `/resume`, `/memorize` and `/commit` as ready-to-use command files. Copy them and restart Claude Code:
+
+```bash
+cp commands/*.md ~/.claude/commands/
+rm ~/.claude/commands/README.md
+export VAULT_DIR=~/vault  # optional; ~/vault is the default
+```
+
+See [commands/README.md](./commands/README.md) for what each command does.
+
+Alternatively, package the same instructions as global skills (`~/.claude/skills/<name>/SKILL.md`, one folder per command). Skills register as slash commands too and can carry extra reference files, but the plain command files are simpler to keep in sync with this repo.
 
 ---
 
@@ -517,10 +521,49 @@ Open Claude Code session
     │
     ├── Work on code                  ← features, bugs, refactors
     │
-    ├── /save                        ← generates session log in vault
+    ├── /memorize (optional)         ← explicit mid-session trigger:
+    │                                   pins a decision or insight now
     │
-    └── git commit                   ← hook rebuilds graph automatically
+    ├── /save                        ← session log + memory consolidation
+    │                                   (decisions, insights, facts)
+    │
+    └── /commit                      ← commit + push, then runs /save
+                                        (post-commit hook rebuilds graph)
 ```
+
+### What /save memorizes
+
+After writing the session log, `/save` runs a consolidation phase. It writes only durable knowledge; when in doubt it writes nothing, because the log already preserves the context.
+
+| Goes into memory | Stays out |
+|------------------|-----------|
+| Technical or architectural decision with a rationale (alternatives were considered) | Progress, completed tasks, pending items (already in the log) |
+| Reusable insight: pattern, pitfall, non-obvious bug root cause, tool behavior | Investigations without a conclusion |
+| Project convention created or changed | Implementation details that don't generalize |
+| Durable project fact: schema, structure, pipeline, path, known bug with a cause | Items already memorized with no change |
+| Correction of something memorized that turned out wrong | |
+
+**Deduplication:** before writing, each candidate is grepped in `<vault>/permanent/`, the project folder and the project `CLAUDE.md`. If an equivalent note exists, it is updated (content and `updated` field), never duplicated.
+
+**Destinations:**
+
+- Decision → appended to `<vault>/<project>/architecture/decisions.md`
+- Reusable insight → new note in `<vault>/permanent/`, plus a one-line pointer in `## Permanent facts` of `<vault>/<project>/CLAUDE.md`
+- Project fact → the matching note in `data/`, `architecture/`, `features/` or `pipeline/`, or a line in `## Permanent facts`
+- Convention → proposed for `## Conventions` in the project's `CLAUDE.md`, written only after you confirm (y/n)
+
+`<vault>/<project>/CLAUDE.md` is created only when the first line is written to it, and archives its oldest sections to `architecture/claude-archive.md` past 300 lines.
+
+**Report format:**
+
+```
+Session log: <vault>/<project>/logs/2026-10-21-short-description.md
+Memory:
+- created: <vault>/permanent/some-insight.md (reason in one line)
+- updated: <vault>/<project>/architecture/decisions.md (reason in one line)
+```
+
+When nothing qualifies, the second line reads `Memory: nothing to consolidate this session`.
 
 ### Savings per layer
 
@@ -552,6 +595,7 @@ Design principles (inspired by [ai-memory](https://github.com/akitaonrails/ai-me
 
 - **Zero LLM calls.** Pure JSONL parsing. Runs in milliseconds, needs no API key.
 - **Safety net, not replacement.** `/save` remains the rich log (decisions, pending items, wikilinks). The auto-log guarantees forgotten sessions still leave a trace: objective (first prompt), files touched, commands executed, stats.
+- **No memory consolidation.** The hook is mechanical and never runs the consolidation phase of `/save`; only `/save` updates decisions, permanent notes and project facts.
 - **Silent failure.** A hook must never break your session. Errors go to `~/scripts/autosave.log` and Claude Code never notices.
 - **Noise filter.** Sessions with fewer than 2 user messages are skipped.
 
@@ -726,6 +770,12 @@ Or, inside Claude Code, use the **skill form** with the leading slash — which 
 ```
 /graphify . --obsidian --obsidian-dir ~/vault/graphify/project-name
 ```
+
+**/save memorized something irrelevant:**
+The consolidation phase follows the criteria in step 2.1 of `~/.claude/commands/save.md`. Tighten them: remove a criterion you don't want, or add the case to the "Not candidates" list. Then delete or edit the note it wrote.
+
+**Duplicate notes in permanent/:**
+Check step 2.2 of `~/.claude/commands/save.md`: the grep must run before any write and must cover `<vault>/permanent/`. If your notes use different terms for the same concept, add aliases to their frontmatter or tags so the grep finds them, then merge the duplicates by hand.
 
 ---
 

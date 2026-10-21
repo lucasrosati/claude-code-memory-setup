@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Since this is a documentation repository, versions track meaningful changes to the
 setup itself: new components, corrections that change the instructions, and new scripts.
 
+## [1.1.0] - 2026-10-21
+
+### Added
+
+- **`commands/` folder** with `/save`, `/resume`, `/memorize` and `/commit` as
+  ready-to-install command files, plus its own README.
+- **Automatic memory consolidation in Phase 2 of `/save`** — explicit criteria
+  for what is memorized, a grep-based deduplication step before every write,
+  destinations per kind of knowledge, and one-line pointers in
+  `## Permanent facts` of `<vault>/<project>/CLAUDE.md`.
+- **"State for resume" section in the session log** — task, branch, pending
+  acceptance criteria, tests run, blockers and the exact next action.
+
+### Changed
+
+- **`/memorize` is now an explicit mid-session trigger**; end-of-session
+  consolidation is handled by `/save`.
+- **`/commit` runs `/save` after the push.**
+- **README installation of the session commands is organized around
+  `commands/`**, with skills kept as an alternative.
+
 ## [1.0.0] - 2026-09-10
 
 First tagged release. The setup is complete and covers the full memory lifecycle
@@ -70,5 +91,6 @@ Initial public guide.
 - Full Portuguese translation (`README.pt-BR.md`).
 - MIT license.
 
+[1.1.0]: https://github.com/lucasrosati/claude-code-memory-setup/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/lucasrosati/claude-code-memory-setup/releases/tag/v1.0.0
 [0.1.0]: https://github.com/lucasrosati/claude-code-memory-setup/releases/tag/v0.1.0

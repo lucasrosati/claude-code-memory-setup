@@ -144,19 +144,9 @@ type: permanent
 - Não mude a estrutura de pastas sem documentar
 
 ## Comandos de Sessão
-
-### /retomar
-Ao receber este comando:
-1. Leia os 3 últimos session logs em logs/
-2. Leia projeto/decisoes.md do projeto atual
-3. Resuma o estado atual e o que falta fazer
-
-### /salvar
-Ao receber este comando:
-1. Crie session log em logs/YYYY-MM-DD-descricao.md
-2. Registre: o que foi feito, decisões tomadas, pendências
-3. Adicione wikilinks para notas criadas/alteradas
-4. Faça git commit + push se em repositório
+/retomar, /salvar, /memorizar e /commit são instalados da pasta commands/
+do guia em ~/.claude/commands/ (veja o passo 6). As instruções completas
+ficam lá; este arquivo guarda só as regras do vault que eles seguem.
 ```
 
 **4. Criar template de nota:**
@@ -190,6 +180,24 @@ EOF
 | 3D Graph | Visualização 3D do vault | Via BRAT (v2.4.1) |
 | Folders to Graph | Pastas como nós no graph | Community Plugins → Browse |
 | Calendar | Navegação por daily notes | Community Plugins → Browse |
+
+**6. Instalar os comandos de sessão:**
+
+A pasta [commands/](./commands/) traz `/save`, `/resume`, `/memorize` e `/commit` como arquivos de comando prontos (em inglês). Para usar os nomes em português, copie com rename seguindo o mapeamento `save` → `salvar`, `resume` → `retomar`, `memorize` → `memorizar` (o `commit` mantém o nome) e reinicie o Claude Code:
+
+```bash
+cp commands/save.md ~/.claude/commands/salvar.md
+cp commands/resume.md ~/.claude/commands/retomar.md
+cp commands/memorize.md ~/.claude/commands/memorizar.md
+cp commands/commit.md ~/.claude/commands/commit.md
+# /memorizar e /commit leem o save.md em tempo de execução: aponte para o novo nome
+perl -pi -e 's|commands/save\.md|commands/salvar.md|g' ~/.claude/commands/memorizar.md ~/.claude/commands/commit.md
+export VAULT_DIR=~/vault  # opcional; ~/vault é o padrão
+```
+
+Os arquivos usam os nomes de pasta da versão em inglês (`architecture/decisions.md`, `data/`). Se o seu vault segue a estrutura deste guia (`projeto/decisoes.md`, `dados/`), troque esses caminhos no `salvar.md` e no `retomar.md`. Veja [commands/README.md](./commands/README.md) para o que cada comando faz.
+
+Como alternativa, empacote as mesmas instruções como skills globais (`~/.claude/skills/<nome>/SKILL.md`, uma pasta por comando). Skills também viram slash commands e podem levar arquivos de referência extras, mas os arquivos de comando são mais simples de manter em sincronia com este repo.
 
 ---
 
@@ -517,10 +525,49 @@ Abrir sessão no Claude Code
     │
     ├── Trabalha no código            ← features, bugs, refactors
     │
-    ├── /salvar                      ← gera session log no vault
+    ├── /memorizar (opcional)        ← gatilho explícito no meio da
+    │                                   sessão: fixa decisão ou insight já
     │
-    └── git commit                   ← hook reconstrói o grafo
+    ├── /salvar                      ← session log + consolidação de memória
+    │                                   (decisões, insights, fatos)
+    │
+    └── /commit                      ← commit + push, depois roda o /salvar
+                                        (hook post-commit reconstrói o grafo)
 ```
+
+### O que o /salvar memoriza
+
+Depois de escrever o session log, o `/salvar` roda uma fase de consolidação. Ele grava só conhecimento durável; na dúvida, não grava nada, porque o log já preserva o contexto.
+
+| Entra na memória | Fica de fora |
+|------------------|--------------|
+| Decisão técnica ou arquitetural com justificativa (houve alternativas consideradas) | Progresso, tarefas concluídas, pendências (já estão no log) |
+| Insight reutilizável: padrão, armadilha, causa raiz de bug não óbvia, comportamento de ferramenta | Investigações sem conclusão |
+| Convenção do projeto criada ou alterada | Detalhes de implementação que não generalizam |
+| Fato durável do projeto: schema, estrutura, pipeline, path, bug conhecido com causa | Item já memorizado sem nenhuma mudança |
+| Correção de algo memorizado que se mostrou errado | |
+
+**Deduplicação:** antes de gravar, cada candidato passa por grep em `<vault>/permanent/`, na pasta do projeto e no `CLAUDE.md` do projeto. Se já existe nota equivalente, ela é atualizada (conteúdo e campo `updated`), nunca duplicada.
+
+**Destinos:**
+
+- Decisão → anexada a `<vault>/<projeto>/projeto/decisoes.md`
+- Insight reutilizável → nota nova em `<vault>/permanent/`, mais um ponteiro de uma linha em `## Permanent facts` do `<vault>/<projeto>/CLAUDE.md`
+- Fato do projeto → a nota correspondente em `dados/`, `projeto/`, `features/` ou `pipeline/`, ou uma linha em `## Permanent facts`
+- Convenção → proposta para `## Conventions` no `CLAUDE.md` do projeto, gravada só depois que você confirmar (y/n)
+
+O `<vault>/<projeto>/CLAUDE.md` só é criado quando a primeira linha é gravada nele, e arquiva as seções mais antigas em `projeto/claude-archive.md` ao passar de 300 linhas.
+
+**Formato do relatório:**
+
+```
+Session log: <vault>/<projeto>/logs/2026-10-21-descricao-curta.md
+Memory:
+- created: <vault>/permanent/algum-insight.md (motivo em uma linha)
+- updated: <vault>/<projeto>/projeto/decisoes.md (motivo em uma linha)
+```
+
+Quando nada se qualifica, a segunda linha é `Memory: nothing to consolidate this session`.
 
 ### Economia por camada
 
@@ -552,6 +599,7 @@ Princípios de design (inspirado no [ai-memory](https://github.com/akitaonrails/
 
 - **Zero chamadas de LLM.** Parsing puro de JSONL. Roda em milissegundos, não precisa de API key.
 - **Rede de segurança, não substituto.** O `/salvar` continua sendo o log rico (decisões, pendências, wikilinks). O auto-log garante que sessões esquecidas ainda deixem rastro: objetivo (primeiro prompt), arquivos tocados, comandos executados, estatísticas.
+- **Sem consolidação de memória.** O hook é mecânico e nunca roda a fase de consolidação do `/salvar`; só o `/salvar` atualiza decisões, notas permanentes e fatos do projeto.
 - **Falha silenciosa.** Um hook nunca pode quebrar sua sessão. Erros vão para `~/scripts/autosave.log` e o Claude Code nem percebe.
 - **Filtro de ruído.** Sessões com menos de 2 mensagens do usuário são ignoradas.
 
@@ -727,6 +775,12 @@ Ou, dentro do Claude Code, use o **formato skill** com a barra inicial — que p
 ```
 /graphify . --obsidian --obsidian-dir ~/vault/graphify/project-name
 ```
+
+**O /salvar memorizou algo irrelevante:**
+A fase de consolidação segue os critérios da etapa 2.1 do `~/.claude/commands/salvar.md`. Aperte esses critérios: remova o que você não quer ou acrescente o caso à lista "Not candidates". Depois apague ou edite a nota gravada.
+
+**Notas duplicadas em permanent/:**
+Confira a etapa 2.2 do `~/.claude/commands/salvar.md`: o grep precisa rodar antes de qualquer gravação e cobrir `<vault>/permanent/`. Se suas notas usam termos diferentes para o mesmo conceito, acrescente aliases no frontmatter ou tags para o grep encontrá-las e junte as duplicatas à mão.
 
 ---
 

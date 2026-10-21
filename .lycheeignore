@@ -18,3 +18,6 @@ YOUR-USER
 YOUR_USER
 your-user
 seu-usuario
+# CHANGELOG links point to tags/releases that only exist after merge
+github\.com/lucasrosati/claude-code-memory-setup/releases/tag/v
+github\.com/lucasrosati/claude-code-memory-setup/compare/v
